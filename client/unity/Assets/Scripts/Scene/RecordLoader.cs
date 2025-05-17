@@ -236,14 +236,14 @@ namespace BattleCity
                 JArray record = (JArray)recordObj["record"];
                 foreach (JObject message in record)
                 {
-                    if (!updateTickStarted && (message["currentStage"]?.ToString() ?? "") == "REST")
-                    {
-                        currentRound.Remove(recordObj);
-                    }
+                    //if (!updateTickStarted && (message["currentStage"]?.ToString() ?? "") == "REST")
+                    //{
+                    //    currentRound.Remove(recordObj);
+                    //}
                     if (message["messageType"].ToString() == "BUFF_SELECT")
                     {
                         hasBuffSelect = true;
-                        JArray details = (JArray)message["details"];
+                        JArray details = (JArray)message["chosenBuffs"];
                         foreach (JObject info in details)
                         {
                             int id = info["token"].ToObject<int>();
@@ -361,26 +361,26 @@ namespace BattleCity
                 this.SendCommand(new UpdateArmorCommand(tank, ArmorData));
                 this.SendCommand(new UpdateSkillsCommand(tank, SkillsData));
                 this.SendCommand(new UpdatePositionCommand(tank, PositionData));
-                lock (_syncRoot)
-                {
-                    // 获取上次位置并比较
-                    bool hasHistory = _positionHistory.TryGetValue(tank, out JToken lastPosition);
-                    bool shouldMove = !hasHistory || !JToken.DeepEquals(PositionData, lastPosition);
+                //lock (_syncRoot)
+                //{
+                //    // 获取上次位置并比较
+                //    bool hasHistory = _positionHistory.TryGetValue(tank, out JToken lastPosition);
+                //    bool shouldMove = !hasHistory || !JToken.DeepEquals(PositionData, lastPosition);
 
-                    // 更新位置存储（无论是否变化都需要更新）
-                    if (hasHistory) _positionHistory.Remove(tank);
-                    _positionHistory.Add(tank, PositionData.DeepClone()); // 使用深拷贝保证数据隔离
+                //    // 更新位置存储（无论是否变化都需要更新）
+                //    if (hasHistory) _positionHistory.Remove(tank);
+                //    _positionHistory.Add(tank, PositionData.DeepClone()); // 使用深拷贝保证数据隔离
 
-                    // 根据比较结果发送命令
-                    if (shouldMove)
-                    {
-                        this.SendCommand(new MoveTankCommand(tank));
-                    }
-                    else
-                    {
-                        this.SendCommand(new StopTankCommand(tank));
-                    }
-                }
+                //    // 根据比较结果发送命令
+                //    if (shouldMove)
+                //    {
+                //        this.SendCommand(new MoveTankCommand(tank));
+                //    }
+                //    else
+                //    {
+                //        this.SendCommand(new StopTankCommand(tank));
+                //    }
+                //}
             }
         }
 
@@ -506,16 +506,38 @@ namespace BattleCity
 
         private IEnumerator BuffSelect(JObject buffInfo, int currentRound)
         {
-            JArray details = (JArray)buffInfo["details"];
-            foreach (JObject info in details)
+            JArray chosenBuffs = (JArray)buffInfo["chosenBuffs"];
+            var available = buffInfo["availableBuffs"].ToObject<List<string>>();
+            BuffSeclectPanel.SetActive(true);
+            for (int i = 0; i < 3; ++i)
+            {
+                for (int id = 1; id <= 2; ++id)
+                {
+                    Image Player_Buff = GameObject.Find($"Canvas/BuffSelect/Player_{id}_Buff_{i + 1}")?.GetComponent<Image>();
+                    Player_Buff.sprite = Resources.Load<Sprite>($"UI/Icons/{available[i]}");
+                }
+            }
+            foreach (JObject info in chosenBuffs)
             {
                 int id = info["token"].ToObject<int>();
                 string buff = info["buff"].ToString();
-                //TODO
+                int chosen = available.IndexOf(buff);
+                for (int i = 0; i < 3; ++i)
+                {
+                    Image Player_Buff = GameObject.Find($"Canvas/BuffSelect/Player_{id}_Buff_{i + 1}")?.GetComponent<Image>();
+                    Color new_color = Player_Buff.color;
+                    if (i == chosen)
+                    {
+                        new_color.a = 1;
+                    }
+                    else
+                    {
+                        new_color.a = 0.5f;
+                    }
+                    Player_Buff.color = new_color;
+                }
                 this.SendCommand(new BuffAddCommand(id, currentRound, buff));
             }
-            
-            BuffSeclectPanel.SetActive(true);
             yield return new WaitForSeconds(3);
             BuffSeclectPanel.SetActive(false);
             this.SendCommand(new BuffShowCommand(1, currentRound));
